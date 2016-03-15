@@ -21,7 +21,10 @@ class CacheMiddleware
 
     public function terminate(Request $request, Response $response)
     {
-        Cache::put(self::buildKey($request), $response->getContent(), 15);
+        $key = self::buildKey($request);
+
+        if(!Cache::has($key))
+            Cache::put($key, $response->getContent(), 1);
     }
 
     private static function buildKey(Request $request)

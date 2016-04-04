@@ -15,7 +15,7 @@ class CacheMiddleware
      *
      * @var int
      */
-    private $duration = 0;
+    private $duration = 10;
 
     /**
      * CacheMiddleware constructor.
@@ -37,7 +37,7 @@ class CacheMiddleware
      */
     public function handle(Request $request, Closure $next, $duration = null)
     {
-        $this->duration = 1 * ($duration ?? $this->duration ?? 15);
+        $this->duration = $duration ?? $this->duration ?? 1;
         $key = self::buildKey($request);
 
         return Cache::has($key)

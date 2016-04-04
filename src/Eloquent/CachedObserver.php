@@ -4,6 +4,8 @@ namespace Eventix\Cache\Eloquent;
 
 use Cache;
 use Illuminate\Database\Eloquent\Model;
+use Helpers;
+use lRedis;
 
 class CachedObserver
 {
@@ -18,19 +20,10 @@ class CachedObserver
     public function saving(Model $model)
     {
         $dirty = $model->getDirtyCached();
-        $tag = self::getTag($model);
 
-        array_walk($dirty, function ($a, $b) use ($model, $tag) {
-            $tag->forever($b, $a);
-        });
+        $key = Helpers::cacheKey($model);
+        lRedis::hmset($key . ":properties", $dirty);
 
         return true;
-    }
-
-    public static function getTag($model, $id = null)
-    {
-        $id = $model instanceof Model && $id == null ? $model->getKey() : $id;
-
-        return Cache::tags('modelcache_' . str_slug(get_class($model) . $id));
     }
 }

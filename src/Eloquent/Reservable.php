@@ -87,6 +87,8 @@ trait Reservable {
         return $count > 1;
     }
 
+    private $easyParsed = [];
+
     /**
      * @param $class The classname of the stored children
      * @param $toAdd An associative array having key the id of the child, and the value the reservation/array of reservation ids
@@ -98,18 +100,39 @@ trait Reservable {
         $to = [];
 
         foreach ($toAdd as $guid => $reservations) {
-            switch (typeof($reservations)) {
+            switch (gettype($reservations)) {
                 case 'array':
                     foreach ($reservations as $reservation) {
+                        $this->easyParsed[$class][$guid][] = $reservation;
                         $to[] = "$class:$key:$reservation";
                     }
                     break;
                 case 'string':
+                    $this->easyParsed[$class][$guid][] = $reservations;
                     $to[] = "$class:$key:$reservations";
                     break;
             }
         }
 
-        lRedis::sadd('reservation:' . $key . ":childReservations", $to);
+        if (!empty($to))
+            lRedis::sadd('reservation:' . $key . ":childReservations", $to);
+    }
+
+    public function getJustInsertedasyParsedChildren() {
+        return $this->easyParsed;
+    }
+
+    /**
+     * @param $class The classname of the stored children
+     * @param $toAdd An associative array having key the id of the child, and the value the reservation/array of reservation ids
+     */
+    public function getReservedChildren() {
+        $key = Helpers::cacheKey($this);
+
+        return lRedis::smembers('reservation:' . $key . ":childReservations");
+    }
+
+    public function isReserved($reservationId) {
+        return lRedis::exists("reservation:$reservationId:" . Helpers::cacheKey($this)) && true;
     }
 }

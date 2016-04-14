@@ -7,8 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Helpers;
 use lRedis;
 
-class CachedObserver
-{
+class CachedObserver {
 
     /**
      * Register the validation event for saving the model. Saving validation
@@ -17,12 +16,12 @@ class CachedObserver
      * @param  \Illuminate\Database\Eloquent\Model $model
      * @return boolean
      */
-    public function saving(Model $model)
-    {
+    public function saving(Model $model) {
         $dirty = $model->getDirtyCached();
 
         $key = Helpers::cacheKey($model);
-        lRedis::hmset($key . ":properties", $dirty);
+        if (!empty($dirty))
+            lRedis::hmset($key . ":properties", $dirty);
 
         return true;
     }

@@ -5,6 +5,7 @@ namespace Eventix\Cache\Eloquent;
 use Illuminate\Contracts\Support\Jsonable;
 use lRedis;
 use Helpers;
+use Illuminate\Database\Eloquent\Model;
 
 trait CacheTrait
 {
@@ -18,7 +19,13 @@ trait CacheTrait
      */
     public static function bootCacheTrait()
     {
-        static::observe(new CachedObserver());
+        static::saving(function (Model $model) {
+            $dirty = $model->getDirtyCached();
+
+            $key = Helpers::cacheKey($model);
+            if (!empty($dirty))
+                lRedis::hmset($key . ":properties", $dirty);
+        }, 1000);
     }
 
     /**

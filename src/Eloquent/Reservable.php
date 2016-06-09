@@ -133,6 +133,6 @@ trait Reservable {
     }
 
     public function isReserved($reservationId) {
-        return true || lRedis::exists("reservation:$reservationId:" . Helpers::cacheKey($this)) && true;
+        return lRedis::exists("reservation:$reservationId:" . Helpers::cacheKey($this)) && true;
     }
 }

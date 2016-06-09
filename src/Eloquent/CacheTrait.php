@@ -7,8 +7,8 @@ use lRedis;
 use Helpers;
 use Illuminate\Database\Eloquent\Model;
 
-trait CacheTrait
-{
+trait CacheTrait {
+
     protected $cachedValues = [];
     private $dirtyCached = [];
 
@@ -17,8 +17,7 @@ trait CacheTrait
      *
      * @return void
      */
-    public static function bootCacheTrait()
-    {
+    public static function bootCacheTrait() {
         static::saving(function (Model $model) {
             $dirty = $model->getDirtyCached();
 
@@ -33,19 +32,18 @@ trait CacheTrait
      *
      * @return array The attributes that are cached
      */
-    public function getCachedProperties()
-    {
+    public function getCachedProperties() {
         return $this->cachedProperties ?? [];
     }
 
-    public function getCachedValues(){
+    public function getCachedValues() {
         return $this->cachedValues ?? [];
     }
 
     public static function seedCached($guid) {
         $class = get_class();
         $instance = $class::find($guid);
-        if(is_null($instance))
+        if (is_null($instance))
             return [];
 
         $key = Helpers::cacheKey($instance) . ":properties";
@@ -55,8 +53,7 @@ trait CacheTrait
         return $dirty;
     }
 
-    public static function findJustCached($guid)
-    {
+    public static function findJustCached($guid) {
         $class = get_class();
         $key = Helpers::cacheKey($class, $guid);
         $all = lRedis::hgetall($key . ":properties");
@@ -64,8 +61,8 @@ trait CacheTrait
         $instance = new $class;
         $casts = $instance->getCasts();
 
-        foreach($casts as $key => $value){
-            if(key_exists($key, $all)){
+        foreach ($casts as $key => $value) {
+            if (key_exists($key, $all)) {
                 $v = $all[$key];
                 $all[$key] = !is_null($v) && $v !== "" ? $instance->castAttribute($key, $all[$key]) : null;
             }
@@ -79,25 +76,21 @@ trait CacheTrait
      *
      * @return void
      */
-    public function forgetCached()
-    {
+    public function forgetCached() {
         lRedis::del(Helpers::cacheKey($this) . ":properties");
     }
 
-    public function getAppends()
-    {
+    public function getAppends() {
         return array_merge(parent::getAppends(), $this->getCachedProperties());
     }
 
-    public function getDirtyCached()
-    {
+    public function getDirtyCached() {
         return $this->dirtyCached;
     }
 
-    public function hydrateCached($cached)
-    {
+    public function hydrateCached($cached) {
         $casts = $this->getCasts();
-        foreach($cached as $key => &$value){
+        foreach ($cached as $key => &$value) {
             $inner = $this->$key ?? $value;
             $value = (in_array($key, $casts) ? $this->castAttribute($key, $inner) : $inner);
             $this->__set($key, $value);
@@ -112,8 +105,7 @@ trait CacheTrait
      * @param  string $key
      * @return mixed
      */
-    public function __get($key)
-    {
+    public function __get($key) {
         if (key_exists($key, $this->getCachedProperties())) {
             return $this->castAttribute($key, $this->getCachedProperties()[$key]);
         }
@@ -127,11 +119,11 @@ trait CacheTrait
      * @param  string $key
      * @return mixed
      */
-    public function __set($key, $value)
-    {
+    public function __set($key, $value) {
         $casts = $this->getCasts();
         if (in_array($key, $this->getCachedProperties())) {
-            $this->dirtyCached[$key] = $this->cachedValues[$key] = in_array($key, $casts) ? $this->castAttribute($key, $value) : $value;
+            $this->dirtyCached[$key] = $this->cachedValues[$key] = in_array($key, $casts)
+                ? $this->castAttribute($key, $value) : $value;
 
             if (key_exists($key, $this->getAttributes())) {
                 return parent::__set($key, $value);
@@ -143,13 +135,11 @@ trait CacheTrait
         }
     }
 
-    public function toArray()
-    {
-        return array_merge(parent::toArray(), $this->cachedValues);
+    public function toArray() {
+        return array_diff_key(array_merge(parent::toArray(), $this->cachedValues), array_flip($this->getHidden()));
     }
 
-    public function newFromBuilder($attributes = [], $connection = null)
-    {
+    public function newFromBuilder($attributes = [], $connection = null) {
         $f = parent::newFromBuilder($attributes, $connection);
 
         $loadKeys = $f->getCachedProperties();
@@ -165,11 +155,11 @@ trait CacheTrait
         return $f;
     }
 
-    public function update(array $attr = [], array $options = []){
+    public function update(array $attr = [], array $options = []) {
         $cached = $this->getCachedProperties();
 
         $todo = array_intersect_key($attr, array_flip($cached));
-        foreach($todo as $key => $value){
+        foreach ($todo as $key => $value) {
 
             $this->cachedValues[$key] = $this->dirtyCached[$key] = $value;
         }
@@ -178,27 +168,23 @@ trait CacheTrait
     }
 }
 
-class Container implements Jsonable, \JsonSerializable
-{
+class Container implements Jsonable, \JsonSerializable {
 
     private $inner;
 
-    public function __construct(Array $arr = [])
-    {
+    public function __construct(Array $arr = []) {
         $this->inner = $arr;
     }
 
-    public function __get($key)
-    {
+    public function __get($key) {
         return $inner[$key] ?? null;
     }
 
-    public function __set($key, $value)
-    {
+    public function __set($key, $value) {
         $inner[$key] = $value;
     }
 
-    public function toJson($options = 0){
+    public function toJson($options = 0) {
         return json_encode($this->inner, $options);
     }
 
@@ -209,8 +195,7 @@ class Container implements Jsonable, \JsonSerializable
      * which is a value of any type other than a resource.
      * @since 5.4.0
      */
-    function jsonSerialize()
-    {
+    function jsonSerialize() {
         return $this->inner;
     }
 }

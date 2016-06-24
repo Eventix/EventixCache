@@ -163,8 +163,24 @@ trait CacheTrait {
 
             $this->cachedValues[$key] = $this->dirtyCached[$key] = $value;
         }
+    }
 
-        return parent::update($attr, $options);
+    public function increment($column, $amount = 1, array $extra = []) {
+        if (in_array($column, $this->cachedProperties)) {
+            $key = Helpers::cacheKey($this);
+            lRedis::hincrby($key . ":properties", $column, $amount);
+        }
+
+        parent::increment($column, $amount, $extra);
+    }
+
+    public function decrement($column, $amount = 1, array $extra = []) {
+        if (in_array($column, $this->cachedProperties)) {
+            $key = Helpers::cacheKey($this);
+            lRedis::hdecrby($key . ":properties", $column, $amount);
+        }
+
+        parent::decrement($column, $amount, $extra);
     }
 }
 

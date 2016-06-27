@@ -53,15 +53,16 @@ trait Reservable {
 
         $all = lRedis::smembers('reservation:' . $key . ":childReservations");
         sort($all);
+
         foreach ($all as $reservation) {
             $split = explode(':', $reservation);
 
-            if (count($split) !== 3)
+            if (count($split) !== 5)
                 continue;
 
             $class = $split[0];
-            $guid = $split[1];
-            $reservation = $split[2];
+            $guid = $split[3];
+            $reservation = $split[4];
 
             if ($this->lastClass !== $class || $this->lastId !== $guid) {
                 $this->lastInstance = $class::find($guid);
@@ -94,7 +95,6 @@ trait Reservable {
      * @param $toAdd An associative array having key the id of the child, and the value the reservation/array of reservation ids
      */
     public function setReservedChildren($class, $toAdd) {
-
         $key = Helpers::cacheKey($this);
 
         $to = [];
@@ -104,12 +104,12 @@ trait Reservable {
                 case 'array':
                     foreach ($reservations as $reservation) {
                         $this->easyParsed[$class][$guid][] = $reservation;
-                        $to[] = "$class:$key:$reservation";
+                        $to[] = "$class:$key:$guid:$reservation";
                     }
                     break;
                 case 'string':
                     $this->easyParsed[$class][$guid][] = $reservations;
-                    $to[] = "$class:$key:$reservations";
+                    $to[] = "$class:$key:$guid:$reservations";
                     break;
             }
         }
@@ -133,6 +133,6 @@ trait Reservable {
     }
 
     public function isReserved($reservationId) {
-        return lRedis::exists("reservation:$reservationId:" . Helpers::cacheKey($this)) && true;
+        return lRedis::exists("reservation:$reservationId:" . Helpers::cacheKey($this)) || false;
     }
 }

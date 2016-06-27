@@ -166,7 +166,7 @@ trait CacheTrait {
     }
 
     public function increment($column, $amount = 1, array $extra = []) {
-        if (in_array($column, $this->cachedProperties)) {
+        if (in_array($column, $this->getCachedProperties())) {
             $key = Helpers::cacheKey($this);
             lRedis::hincrby($key . ":properties", $column, $amount);
         }
@@ -175,7 +175,7 @@ trait CacheTrait {
     }
 
     public function decrement($column, $amount = 1, array $extra = []) {
-        if (in_array($column, $this->cachedProperties)) {
+        if (in_array($column, $this->getCachedProperties())) {
             $key = Helpers::cacheKey($this);
             lRedis::hdecrby($key . ":properties", $column, $amount);
         }

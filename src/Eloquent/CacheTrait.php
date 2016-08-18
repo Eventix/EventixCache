@@ -163,6 +163,8 @@ trait CacheTrait {
 
             $this->cachedValues[$key] = $this->dirtyCached[$key] = $value;
         }
+        
+        return parent::update($attr, $options);
     }
 
     public function increment($column, $amount = 1, array $extra = []) {

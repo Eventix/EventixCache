@@ -19,7 +19,7 @@ trait Reservable {
             lRedis::hincrby($key . ":properties", 'reserved_count', 1);
         }
 
-        if ($this->isReservable() === false) {
+        if ($this->isReservable(true, $guid) === false) {
             $this->releaseReserved($guid);
 
             return false;
@@ -51,7 +51,10 @@ trait Reservable {
         $count = lRedis::del('reservation:' . $guid . ":$key");
         $count += lRedis::srem($key . ':reserves', $guid);
 
-        $all = lRedis::smembers('reservation:' . $key . ":childReservations");
+
+        $hashKey = 'reservation:' . $key . ":$guid:childReservations";
+        $all = lRedis::smembers($hashKey);
+
         sort($all);
 
         foreach ($all as $reservation) {
@@ -79,7 +82,9 @@ trait Reservable {
             $this->lastInstance->releaseReserved($reservation);
         }
 
-        lRedis::del('reservation:' . $key . ":childReservations");
+        ~d($hashKey);
+
+        lRedis::del($hashKey);
 
         if ($count)
             lRedis::hincrby($key . ":properties", 'reserved_count', -1);
@@ -94,7 +99,7 @@ trait Reservable {
      * @param $class The classname of the stored children
      * @param $toAdd An associative array having key the id of the child, and the value the reservation/array of reservation ids
      */
-    public function setReservedChildren($class, $toAdd) {
+    public function setReservedChildren($class, $reservation, $toAdd) {
         $key = Helpers::cacheKey($this);
 
         $to = [];
@@ -115,24 +120,14 @@ trait Reservable {
         }
 
         if (!empty($to))
-            lRedis::sadd('reservation:' . $key . ":childReservations", $to);
+            lRedis::sadd('reservation:' . $key . ":$reservation:childReservations", $to);
     }
 
     public function getJustInsertedasyParsedChildren() {
         return $this->easyParsed;
     }
 
-    /**
-     * @param $class The classname of the stored children
-     * @param $toAdd An associative array having key the id of the child, and the value the reservation/array of reservation ids
-     */
-    public function getReservedChildren() {
-        $key = Helpers::cacheKey($this);
-
-        return lRedis::smembers('reservation:' . $key . ":childReservations");
-    }
-
     public function isReserved($reservationId) {
-        return lRedis::exists("reservation:$reservationId:" . Helpers::cacheKey($this)) || false;
+        return true || lRedis::exists("reservation:$reservationId:" . Helpers::cacheKey($this)) || false;
     }
 }

@@ -82,8 +82,6 @@ trait Reservable {
             $this->lastInstance->releaseReserved($reservation);
         }
 
-        ~d($hashKey);
-
         lRedis::del($hashKey);
 
         if ($count)
@@ -128,6 +126,6 @@ trait Reservable {
     }
 
     public function isReserved($reservationId) {
-        return true || lRedis::exists("reservation:$reservationId:" . Helpers::cacheKey($this)) || false;
+        return lRedis::exists("reservation:$reservationId:" . Helpers::cacheKey($this)) || false;
     }
 }

@@ -179,7 +179,7 @@ trait CacheTrait {
     public function decrement($column, $amount = 1, array $extra = []) {
         if (in_array($column, $this->getCachedProperties())) {
             $key = Helpers::cacheKey($this);
-            lRedis::hdecrby($key . ":properties", $column, $amount);
+            lRedis::hincrby($key . ":properties", $column, (-1)*$amount);
         }
 
         parent::decrement($column, $amount, $extra);

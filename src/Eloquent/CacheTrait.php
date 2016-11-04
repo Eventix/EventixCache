@@ -106,15 +106,20 @@ trait CacheTrait {
      * @return mixed
      */
     public function __get($key) {
-        if (key_exists($key, $this->getCachedProperties())) {
-            return $this->castAttribute($key, $this->getCachedProperties()[$key]);
+        if (in_array($key, $this->getCachedProperties()) && array_key_exists($key, $this->cachedValues)) {
+            $rKey = Helpers::cacheKey($this);
+            $value = lRedis::hget($rKey . ":properties", $key);
+            if ($this->hasCast($key))
+                return $this->castAttribute($key, $value);
+
+            return $value;
         }
 
         return parent::__get($key);
     }
 
     /**
-     * Dynamically retrieve attributes on the model.
+     * Dynamically set attributes on the model.
      *
      * @param  string $key
      * @return mixed

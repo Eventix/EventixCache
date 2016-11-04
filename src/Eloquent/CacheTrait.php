@@ -109,10 +109,7 @@ trait CacheTrait {
         if (in_array($key, $this->getCachedProperties()) && array_key_exists($key, $this->cachedValues)) {
             $rKey = Helpers::cacheKey($this);
             $value = lRedis::hget($rKey . ":properties", $key);
-            if ($this->hasCast($key))
-                return $this->castAttribute($key, $value);
-
-            return $value;
+            return array_key_exists($key, $this->getCasts()) ? $this->castAttribute($key, $value) : $value;
         }
 
         return parent::__get($key);
@@ -127,11 +124,11 @@ trait CacheTrait {
     public function __set($key, $value) {
         $casts = $this->getCasts();
         if (in_array($key, $this->getCachedProperties())) {
-            $this->dirtyCached[$key] = $this->cachedValues[$key] = in_array($key, $casts)
+            $this->dirtyCached[$key] = $this->cachedValues[$key] = array_key_exists($key, $casts)
                 ? $this->castAttribute($key, $value) : $value;
 
             if (key_exists($key, $this->getAttributes())) {
-                return parent::__set($key, $value);
+                return parent::__set($key, $this->cachedValues[$key]);
             }
 
             return $this;
@@ -165,7 +162,6 @@ trait CacheTrait {
 
         $todo = array_intersect_key($attr, array_flip($cached));
         foreach ($todo as $key => $value) {
-
             $this->cachedValues[$key] = $this->dirtyCached[$key] = $value;
         }
         
@@ -178,7 +174,8 @@ trait CacheTrait {
             lRedis::hincrby($key . ":properties", $column, $amount);
         }
 
-        parent::increment($column, $amount, $extra);
+        if(array_key_exists($column, $this->attributes)) // For exisiting DB Properties
+            parent::increment($column, $amount, $extra);
     }
 
     public function decrement($column, $amount = 1, array $extra = []) {
@@ -187,7 +184,8 @@ trait CacheTrait {
             lRedis::hincrby($key . ":properties", $column, (-1)*$amount);
         }
 
-        parent::decrement($column, $amount, $extra);
+        if(array_key_exists($column, $this->attributes)) // For exisiting DB Properties
+            parent::decrement($column, $amount, $extra);
     }
 }
 

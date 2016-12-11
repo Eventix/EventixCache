@@ -92,7 +92,7 @@ trait CacheTrait {
         $casts = $this->getCasts();
         foreach ($cached as $key => &$value) {
             $inner = $this->$key ?? $value;
-            $value = (in_array($key, $casts) ? $this->castAttribute($key, $inner) : $inner);
+            $value = (array_key_exists($key, $casts) ? $this->castAttribute($key, $inner) : $inner);
             $this->__set($key, $value);
         }
 
@@ -127,6 +127,10 @@ trait CacheTrait {
             $this->dirtyCached[$key] = $this->cachedValues[$key] = array_key_exists($key, $casts)
                 ? $this->castAttribute($key, $value) : $value;
 
+            $rKey = Helpers::cacheKey($this);
+            lRedis::hset($rKey . ":properties", $key, $this->cachedValues[$key]);
+
+            // If key exists in Cache and DB
             if (key_exists($key, $this->getAttributes())) {
                 return parent::__set($key, $this->cachedValues[$key]);
             }
@@ -169,7 +173,7 @@ trait CacheTrait {
     }
 
     public function increment($column, $amount = 1, array $extra = []) {
-        if (in_array($column, $this->getCachedProperties())) {
+        if (in_array($column, $this->getCachedProperties()) && !array_key_exists($column, $this->attributes)) {
             $key = Helpers::cacheKey($this);
             lRedis::hincrby($key . ":properties", $column, $amount);
         }
@@ -179,7 +183,7 @@ trait CacheTrait {
     }
 
     public function decrement($column, $amount = 1, array $extra = []) {
-        if (in_array($column, $this->getCachedProperties())) {
+        if (in_array($column, $this->getCachedProperties()) && !array_key_exists($column, $this->attributes)) {
             $key = Helpers::cacheKey($this);
             lRedis::hincrby($key . ":properties", $column, (-1)*$amount);
         }

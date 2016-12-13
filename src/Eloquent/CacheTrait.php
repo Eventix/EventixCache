@@ -2,10 +2,10 @@
 
 namespace Eventix\Cache\Eloquent;
 
-use Illuminate\Contracts\Support\Jsonable;
-use lRedis;
 use Helpers;
+use Illuminate\Contracts\Support\Jsonable;
 use Illuminate\Database\Eloquent\Model;
+use lRedis;
 
 trait CacheTrait {
 
@@ -25,6 +25,60 @@ trait CacheTrait {
             if (!empty($dirty))
                 lRedis::hmset($key . ":properties", $dirty);
         }, 1000);
+
+        static::created(function (Model $model) {
+            $props = $model->getCachedProperties();
+            $casts = $model->getCasts();
+
+            $dirty = [];
+
+            foreach ($props as $prop) {
+                $inner = $model->$prop;
+                $val = (array_key_exists($prop, $casts) ? self::nullCastAttribute($prop, $inner, $casts) : $inner);
+
+                $dirty[$prop] = $val;
+            }
+
+            $key = Helpers::cacheKey($model);
+            if (!empty($dirty))
+                lRedis::hmset($key . ":properties", $dirty);
+        });
+    }
+
+    private static function getCastTypeInner($key, $casts) {
+        return trim(strtolower($casts[$key]));
+    }
+
+    private static function nullCastAttribute($key, $value, $casts) {
+
+        switch (self::getCastTypeInner($key, $casts)) {
+            case 'int':
+            case 'integer':
+                return (int)$value;
+            case 'real':
+            case 'float':
+            case 'double':
+                return (float)$value;
+            case 'string':
+                return (string)$value;
+            case 'bool':
+            case 'boolean':
+                return (bool)$value;
+            case 'object':
+                return $this->fromJson($value, true);
+            case 'array':
+            case 'json':
+                return $this->fromJson($value);
+            case 'collection':
+                return new BaseCollection($this->fromJson($value));
+            case 'date':
+            case 'datetime':
+                return $this->asDateTime($value);
+            case 'timestamp':
+                return $this->asTimeStamp($value);
+            default:
+                return $value;
+        }
     }
 
     /**
@@ -109,6 +163,7 @@ trait CacheTrait {
         if (in_array($key, $this->getCachedProperties()) && array_key_exists($key, $this->cachedValues)) {
             $rKey = Helpers::cacheKey($this);
             $value = lRedis::hget($rKey . ":properties", $key);
+
             return array_key_exists($key, $this->getCasts()) ? $this->castAttribute($key, $value) : $value;
         }
 
@@ -127,13 +182,9 @@ trait CacheTrait {
             $this->dirtyCached[$key] = $this->cachedValues[$key] = array_key_exists($key, $casts)
                 ? $this->castAttribute($key, $value) : $value;
 
-            $rKey = Helpers::cacheKey($this);
-            lRedis::hset($rKey . ":properties", $key, $this->cachedValues[$key]);
-
             // If key exists in Cache and DB
-            if (key_exists($key, $this->getAttributes())) {
+            if (key_exists($key, $this->getAttributes()))
                 return parent::__set($key, $this->cachedValues[$key]);
-            }
 
             return $this;
         } else {
@@ -168,7 +219,7 @@ trait CacheTrait {
         foreach ($todo as $key => $value) {
             $this->cachedValues[$key] = $this->dirtyCached[$key] = $value;
         }
-        
+
         return parent::update($attr, $options);
     }
 
@@ -178,17 +229,17 @@ trait CacheTrait {
             lRedis::hincrby($key . ":properties", $column, $amount);
         }
 
-        if(array_key_exists($column, $this->attributes)) // For exisiting DB Properties
+        if (array_key_exists($column, $this->attributes)) // For exisiting DB Properties
             parent::increment($column, $amount, $extra);
     }
 
     public function decrement($column, $amount = 1, array $extra = []) {
         if (in_array($column, $this->getCachedProperties()) && !array_key_exists($column, $this->attributes)) {
             $key = Helpers::cacheKey($this);
-            lRedis::hincrby($key . ":properties", $column, (-1)*$amount);
+            lRedis::hincrby($key . ":properties", $column, (-1) * $amount);
         }
 
-        if(array_key_exists($column, $this->attributes)) // For exisiting DB Properties
+        if (array_key_exists($column, $this->attributes)) // For exisiting DB Properties
             parent::decrement($column, $amount, $extra);
     }
 }

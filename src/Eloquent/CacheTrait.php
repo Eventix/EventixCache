@@ -65,17 +65,13 @@ trait CacheTrait {
             case 'boolean':
                 return (bool)$value;
             case 'object':
-                return $this->fromJson($value, true);
+                return \json_decode($value, false);
             case 'array':
             case 'json':
-                return $this->fromJson($value);
+                return \json_decode($value, true);
             case 'collection':
-                return new BaseCollection($this->fromJson($value));
+                return new BaseCollection(\json_decode($value, true));
             case 'date':
-            case 'datetime':
-                return $this->asDateTime($value);
-            case 'timestamp':
-                return $this->asTimeStamp($value);
             default:
                 return $value;
         }
@@ -253,7 +249,7 @@ class Container implements Jsonable, \JsonSerializable {
     }
 
     public function __get($key) {
-        return $inner[$key] ?? null;
+        return $this->inner[$key] ?? null;
     }
 
     public function __set($key, $value) {

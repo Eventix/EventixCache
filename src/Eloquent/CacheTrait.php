@@ -220,7 +220,7 @@ trait CacheTrait {
     }
 
     public function increment($column, $amount = 1, array $extra = []) {
-        if (in_array($column, $this->getCachedProperties()) && !array_key_exists($column, $this->attributes)) {
+        if (in_array($column, $this->getCachedProperties())){
             $key = Helpers::cacheKey($this);
             lRedis::hincrby($key . ":properties", $column, $amount);
         }

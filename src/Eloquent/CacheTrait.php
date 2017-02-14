@@ -19,7 +19,17 @@ trait CacheTrait {
      */
     public static function bootCacheTrait() {
         static::saving(function (Model $model) {
-            $dirty = $model->getDirtyCached();
+            $props = $model->getCachedProperties();
+            $casts = $model->getCasts();
+
+            $dirty = [];
+
+            foreach ($props as $prop) {
+                $inner = $model->$prop;
+                $val = (array_key_exists($prop, $casts) ? self::nullCastAttribute($prop, $inner, $casts) : $inner);
+
+                $dirty[$prop] = $val;
+            }
 
             $key = Helpers::cacheKey($model);
             if (!empty($dirty))
@@ -157,10 +167,10 @@ trait CacheTrait {
      */
     public function __get($key) {
         if (in_array($key, $this->getCachedProperties()) && array_key_exists($key, $this->cachedValues)) {
-            $rKey = Helpers::cacheKey($this);
-            $value = lRedis::hget($rKey . ":properties", $key);
+            if ($this->hasCast($key))
+                return $this->castAttribute($key, $this->cachedValues[$key]);
 
-            return array_key_exists($key, $this->getCasts()) ? $this->castAttribute($key, $value) : $value;
+            return $this->cachedValues[$key];
         }
 
         return parent::__get($key);

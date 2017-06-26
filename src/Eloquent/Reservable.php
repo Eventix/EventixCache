@@ -51,7 +51,6 @@ trait Reservable {
         $count = lRedis::del('reservation:' . $guid . ":$key");
         $count += lRedis::srem($key . ':reserves', $guid);
 
-
         $hashKey = 'reservation:' . $key . ":$guid:childReservations";
         $all = lRedis::smembers($hashKey);
 
@@ -128,4 +127,15 @@ trait Reservable {
     public function isReserved($reservationId) {
         return lRedis::exists("reservation:$reservationId:" . Helpers::cacheKey($this)) || false;
     }
+
+    protected $reservedIds = [];
+
+    public function isUnique($reservationId){
+        if(!in_array($reservationId, $this->reservedIds)){
+            $this->reservedIds[] = $reservationId;
+            return true;
+        }
+        return false;
+    }
+
 }

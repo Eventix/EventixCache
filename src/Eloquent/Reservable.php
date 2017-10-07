@@ -14,12 +14,14 @@ trait Reservable {
         $duration = $this->getReservationTime() * 60;
         $count = lRedis::setex('reservation:' . $guid . ":$key", $duration, $key);
 
+        $currentReservedCount = 0;
         if ($count) {
             lRedis::sadd($key . ':reserves', $guid);
-            lRedis::hincrby($key . ":properties", 'reserved_count', 1);
+            $newReservedCount = lRedis::hincrby($key . ":properties", 'reserved_count', 1);
+            $currentReservedCount = $newReservedCount - 1;
         }
 
-        if ($this->isReservable(true, $guid) === false) {
+        if ($this->isReservable(true, $guid, $currentReservedCount) === false) {
             $this->releaseReserved($guid);
 
             return false;

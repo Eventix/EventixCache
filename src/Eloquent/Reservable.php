@@ -1,41 +1,54 @@
 <?php namespace Eventix\Cache\Eloquent;
 
+use Eventix\Cache\Reservator;
 use Illuminate\Support\MessageBag;
 use Uuid;
 use lRedis;
 use Helpers;
+use DB;
 
 trait Reservable {
 
-    public function reserve(bool $doWork = true) {
-        $guid = '' . Uuid::generate();
+    private $childReservations = [];
 
-        $key = Helpers::cacheKey($this);
-        $duration = $this->getReservationTime() * 60;
-        $count = lRedis::setex('reservation:' . $guid . ":$key", $duration, $key);
-
-        $currentReservedCount = 0;
-        if ($count) {
-            lRedis::sadd($key . ':reserves', $guid);
-            $newReservedCount = lRedis::hincrby($key . ":properties", 'reserved_count', 1);
-            $currentReservedCount = $newReservedCount - 1;
-        }
-
-        if ($this->isReservable(true, $guid, $currentReservedCount) === false) {
-            $this->releaseReserved($guid);
-
+    public function reserve($doWork = true) {
+        $children = $this->getChildren(true);
+        if ($children === false)
             return false;
-        }
 
-        return $guid;
+        $this->childReservations = $children;
+        $status = $this->isReservable(true);
+
+        return $status === 0
+            ? ($doWork ? Reservator::reserve($this->guid, $this->getReservationTime(), $children) : $status === 0)
+            : $status;
     }
 
+    public function getchildReservations() {
+        return $this->childReservations;
+    }
+
+    public function releaseReservation($reservation) {
+        return Reservator::release($reservation);
+    }
+
+    public function isReserved($reservation) {
+        return Reservator::checkReservation($this->guid, $reservation);
+    }
+
+    // Get default reservation time in shop
     public function getReservationTime() {
         return env('RESERVATION_DURATION', 20);
     }
 
-    public function isReservable(bool $doWork = true) {
+    // Retrieve whether we are reservable
+    // Should return 0 when success; 1 when sold out and 2 when everything is in reservation, and 3 when not yet sold
+    public function isReservable($doWork = false) {
         return true;
+    }
+
+    public function getChildren($doWork = false) {
+        return [];
     }
 
     public function getReservationErrors() {
@@ -43,101 +56,4 @@ trait Reservable {
 
         return (gettype($errors) === 'array' ? new MessageBag($errors) : $errors);
     }
-
-    private $lastInstance = false;
-    private $lastClass = false;
-    private $lastId = false;
-
-    public function releaseReserved($guid) {
-        $key = Helpers::cacheKey($this);
-        $count = lRedis::del('reservation:' . $guid . ":$key");
-        $count += lRedis::srem($key . ':reserves', $guid);
-
-        $hashKey = 'reservation:' . $key . ":$guid:childReservations";
-        $all = lRedis::smembers($hashKey);
-
-        sort($all);
-
-        foreach ($all as $reservation) {
-            $split = explode(':', $reservation);
-
-            if (count($split) !== 5)
-                continue;
-
-            $class = $split[0];
-            $guid = $split[3];
-            $reservation = $split[4];
-
-            if ($this->lastClass !== $class || $this->lastId !== $guid) {
-                $this->lastInstance = $class::find($guid);
-
-                if (is_null($this->lastInstance)) {
-                    $this->lastInstance = false;
-                    continue;
-                }
-            }
-
-            $this->lastClass = $class;
-            $this->lastId = $guid;
-
-            $this->lastInstance->releaseReserved($reservation);
-        }
-
-        lRedis::del($hashKey);
-
-        if ($count)
-            lRedis::hincrby($key . ":properties", 'reserved_count', -1);
-
-        // Should be 2, so greater 1 works
-        return $count > 1;
-    }
-
-    private $easyParsed = [];
-
-    /**
-     * @param $class The classname of the stored children
-     * @param $toAdd An associative array having key the id of the child, and the value the reservation/array of reservation ids
-     */
-    public function setReservedChildren($class, $reservation, $toAdd) {
-        $key = Helpers::cacheKey($this);
-
-        $to = [];
-
-        foreach ($toAdd as $guid => $reservations) {
-            switch (gettype($reservations)) {
-                case 'array':
-                    foreach ($reservations as $reservation) {
-                        $this->easyParsed[$class][$guid][] = $reservation;
-                        $to[] = "$class:$key:$guid:$reservation";
-                    }
-                    break;
-                case 'string':
-                    $this->easyParsed[$class][$guid][] = $reservations;
-                    $to[] = "$class:$key:$guid:$reservations";
-                    break;
-            }
-        }
-
-        if (!empty($to))
-            lRedis::sadd('reservation:' . $key . ":$reservation:childReservations", $to);
-    }
-
-    public function getJustInsertedasyParsedChildren() {
-        return $this->easyParsed;
-    }
-
-    public function isReserved($reservationId) {
-        return lRedis::exists("reservation:$reservationId:" . Helpers::cacheKey($this)) || false;
-    }
-
-    protected $reservedIds = [];
-
-    public function isUnique($reservationId){
-        if(!in_array($reservationId, $this->reservedIds)){
-            $this->reservedIds[] = $reservationId;
-            return true;
-        }
-        return false;
-    }
-
 }

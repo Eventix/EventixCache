@@ -6,8 +6,7 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\Foundation\Application;
 use Eventix\Cache\Middleware\CacheMiddleware;
 
-class CacheServiceProvider extends ServiceProvider
-{
+class CacheServiceProvider extends ServiceProvider {
 
     private static $configPath = __DIR__ . '/../config/config.php';
 
@@ -18,13 +17,11 @@ class CacheServiceProvider extends ServiceProvider
      *
      * @return array
      */
-    public function provides()
-    {
+    public function provides() {
         return [CacheMiddleware::class];
     }
 
-    public function register()
-    {
+    public function register() {
         $this->app->singleton(CacheMiddleware::class, function ($app) {
             return new CacheMiddleware($app['config']->get('special-cache.cacheDuration'));
         });
@@ -32,11 +29,15 @@ class CacheServiceProvider extends ServiceProvider
         $this->mergeConfigFrom(self::$configPath, 'special-cache');
     }
 
-    public function boot()
-    {
+    public function boot() {
         if (!$this->app instanceof Application || !$this->app->runningInConsole()) {
             return;
         }
+        $this->app->singleton('command.reservations.expirehandle', function ($app) {
+            return new ReservationExpireHandler;
+        });
+
+        $this->commands(['command.reservations.expirehandle']);
 
         $this->publishes([self::$configPath => config_path('special-cache.php')]);
     }

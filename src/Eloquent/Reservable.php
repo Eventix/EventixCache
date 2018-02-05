@@ -12,16 +12,20 @@ trait Reservable {
     private $childReservations = [];
 
     public function reserve($doWork = true) {
-        $children = $this->getChildren(true);
-        if ($children === false)
-            return false;
+        $children = $this->getChildren($doWork);
 
-        $this->childReservations = $children;
+        if (!is_array($children) && $children !== 0)
+            return $children;
+
+        if ($doWork)
+            $this->childReservations = $children;
+
         $status = $this->isReservable(true);
 
-        return $status === 0
-            ? ($doWork ? Reservator::reserve($this->guid, $this->getReservationTime(), $children) : $status === 0)
-            : $status;
+        if ($status !== 0)
+            return $status;
+
+        return $doWork ? Reservator::reserve($this->guid, $this->getReservationTime(), $children) : $status;
     }
 
     public function getchildReservations() {

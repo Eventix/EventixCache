@@ -37,9 +37,14 @@ class Reservator {
         }
 
         // Add the childreservations
-        if (count($childReservations)) {
-            array_unshift($childReservations, "$base:children");
-            call_user_func_array(['lRedis', 'sAdd'], $childReservations);
+        if (is_array($childReservations) && count($childReservations)) {
+
+            $set = [];
+            foreach ($childReservations as $obj => $child)
+                foreach ($child as $res)
+                    $set[$res] = $obj;
+
+            lRedis::hmset("$base:children", $set);
         }
 
         return $reservation;
@@ -57,13 +62,15 @@ class Reservator {
             return false;
 
         // Check all child reservations
-        $iterator = null;
         // Don't ever return an empty array until we're done iterating
-        lRedis::setOption(lRedis::OPT_SCAN, lRedis::SCAN_RETRY);
-        while ($children = $redis->hScan("$baseKey:children", $iterator))
-            foreach ($children as $childReservation => $childKey)
+        $cursor = 0;
+
+        do {
+            list($cursor, $keys) = lRedis::hscan("$baseKey:children", $cursor);
+            foreach ($keys as $childReservation => $childKey)
                 if (!static::checkReservation($childKey, $childReservation))
                     return false;
+        } while ($cursor);
 
         return true;
     }
@@ -71,18 +78,19 @@ class Reservator {
     public static function release($reservation) {
         $baseKey = self::$base . $reservation;
 
-        // First delete basekey
-        lRedis::del($baseKey);
+        // First delete basekey, when nothing is deleted, return false
+        if (lRedis::del($baseKey) == 0)
+            return false;
 
-        $id = lRedis::get($baseKey . ":id");
+        $id = lRedis::get("$baseKey:id");
 
         if (!empty($id)) {
             // Release all child resevations
 
             $cursor = 0;
             do {
-                list($cursor, $keys) = lRedis::scan($cursor, 'match', "$baseKey:children");
-                foreach ($keys as $key)
+                list($cursor, $keys) = lRedis::hscan("$baseKey:children", $cursor);
+                foreach ($keys as $childReservation => $childKey)
                     self::release($childReservation);
             } while ($cursor);
 
@@ -93,5 +101,7 @@ class Reservator {
                 ->del("$baseKey:children")
                 ->execute();
         }
+
+        return true;
     }
 }

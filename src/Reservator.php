@@ -50,8 +50,16 @@ class Reservator {
         return $reservation;
     }
 
-    public static function getCountFor($id) {
-        return 1 * lRedis::get("reservationcount:$id");
+    public static function getCountFor($id, $name = 'reservationcount') {
+        return 1 * lRedis::get("$name:$id");
+    }
+
+    public static function incrementCountFor($id, $name = 'pendingcount') {
+        return lRedis::incrBy("$name:$id", -1);
+    }
+
+    public static function decrementCountFor($id, $name = 'pendingcount') {
+        return lRedis::incrBy("$name:$id", -1);
     }
 
     public static function checkReservation($key, $reservation) {

@@ -11,6 +11,11 @@ trait Reservable {
 
     private $childReservations = [];
 
+    /**
+     * @param bool $doWork
+     * @return array|bool|string
+     * @throws \Exception
+     */
     public function reserve($doWork = true) {
         $children = $this->getChildren($doWork);
 

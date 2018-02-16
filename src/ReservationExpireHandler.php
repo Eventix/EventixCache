@@ -31,7 +31,8 @@ class ReservationExpireHandler extends Command {
      */
     public function handle() {
         lRedis::pSubscribe(['__keyevent@*__:expired'], function ($message) {
-            $this->dispatch(new RemoveReservation(substr($message, strlen(Reservator::$base))));
+            $base = Reservator::$base . ":";
+            $this->dispatch(new RemoveReservation(substr($message, strlen($base))));
         });
     }
 }

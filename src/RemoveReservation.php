@@ -17,6 +17,7 @@ class RemoveReservation extends Job implements ShouldQueue {
     /**
      * Create a new job instance.
      *
+     * @param string $reservation
      * @return void
      */
     public function __construct($reservation) {

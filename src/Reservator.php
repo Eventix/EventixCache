@@ -9,7 +9,7 @@ class Reservator {
 
     private static $releases = [];
     public static $base = "reservation";
-    public static $reservationCountBase = "reservationcount";
+    public static $reservedCountBase = "reservedcount";
     public static $pendingCountBase = "pendingcount";
 
     public static function addRelease ($reservation) {
@@ -31,17 +31,17 @@ class Reservator {
         $reservation = (string) Uuid::generate();
 
         $base = self::$base . ":" . $reservation;
-        $reservationCountBase = self::$reservationCountBase;
+        $reservedCountBase = self::$reservedCountBase;
 
         $result = lRedis::transaction()
                         ->getset("$base:id", $id)// Set a key so we can always retrieve the id of the reserved object
-                        ->setex($base, $duration * 60, $id)// Set another key which expires at the desiried duration
-                        ->incr("$reservationCountBase:$id")// Increment the reservationcount for the id of the thing we are reserving
+                        ->setex($base, $duration * 60, $id)// Set another key which expires at the desired duration
+                        ->incr("$reservedCountBase:$id")// Increment the reservedcount for the id of the thing we are reserving
                         ->exec();
 
         if (!empty($result[0])) {
             // If not empty we are interfering with another reservation, so simply decrement and return false
-            self::decrementReservationCountFor($id);
+            self::decrementReservedCountFor($id);
 
             return false;
         }
@@ -64,8 +64,8 @@ class Reservator {
      * @param string|array $id
      * @return array|float|int
      */
-    public static function getReservationCountFor ($id) {
-        return self::getCountFor($id, self::$reservationCountBase);
+    public static function getReservedCountFor ($id) {
+        return self::getCountFor($id, self::$reservedCountBase);
     }
 
     /**
@@ -83,7 +83,7 @@ class Reservator {
      */
     public static function getCountFor ($id, $name = null) {
         if (is_null($name))
-            $name = self::$reservationCountBase;
+            $name = self::$reservedCountBase;
 
         if (is_array($id)) {
             foreach ($id as $key => $value) {
@@ -102,8 +102,8 @@ class Reservator {
      * @param int $diff
      * @return array|float|int
      */
-    public static function incrementReservationCountFor ($id, int $diff = 1) {
-        return self::incrementCountFor($id, self::$reservationCountBase, $diff);
+    public static function incrementReservedCountFor ($id, int $diff = 1) {
+        return self::incrementCountFor($id, self::$reservedCountBase, $diff);
     }
 
     /**
@@ -120,8 +120,8 @@ class Reservator {
      * @param int $diff
      * @return array|float|int
      */
-    public static function decrementReservationCountFor ($id, int $diff = 1) {
-        return self::incrementCountFor($id, self::$reservationCountBase, (-1) * $diff);
+    public static function decrementReservedCountFor ($id, int $diff = 1) {
+        return self::incrementCountFor($id, self::$reservedCountBase, (-1) * $diff);
     }
 
     /**
@@ -183,7 +183,7 @@ class Reservator {
 
     public static function release ($reservation) {
         $baseKey = self::$base . ":" . $reservation;
-        $reservationCountBase = self::$reservationCountBase;
+        $reservedCountBase = self::$reservedCountBase;
 
         // First delete basekey, when nothing is deleted, return false
         if (lRedis::del($baseKey) == 0)
@@ -203,7 +203,7 @@ class Reservator {
             // Now decrement and delete all relevant keys
             $result = lRedis::pipeline()
                             ->del("$baseKey:id")
-                            ->incrBy("$reservationCountBase:$id", -1)
+                            ->incrBy("$reservedCountBase:$id", -1)
                             ->del("$baseKey:children")
                             ->execute();
 

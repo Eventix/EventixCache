@@ -207,9 +207,8 @@ class Reservator {
                             ->del("$baseKey:children")
                             ->execute();
 
-            if (!empty($result[0])) {
-                // TODO If not empty something failed.. what to do??
-                return false;
+            if ($result[0] !== 1 || $result[1] < 0) {
+                // TODO something failed.. what to do??
             }
         }
 

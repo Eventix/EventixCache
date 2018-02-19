@@ -32,7 +32,7 @@ trait Reservable {
             // When we are reserving, release child reservations on error
             if ($doWork)
                 foreach ($children as $childProduct)
-                    foreach ($childProducts as $childReservation)
+                    foreach ($childProduct as $childReservation)
                         Reservator::release($childReservation);
 
             return $status;

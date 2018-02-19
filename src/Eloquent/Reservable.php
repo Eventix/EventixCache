@@ -27,8 +27,16 @@ trait Reservable {
 
         $status = $this->isReservable(true);
 
-        if ($status !== 0)
+        if ($status !== 0) {
+
+            // When we are reserving, release child reservations on error
+            if ($doWork)
+                foreach ($children as $childProduct)
+                    foreach ($childProducts as $childReservation)
+                        Reservator::release($childReservation);
+
             return $status;
+        }
 
         return $doWork ? Reservator::reserve($this->guid, $this->getReservationTime(), $children) : $status;
     }

@@ -85,16 +85,15 @@ class Reservator {
         if (is_null($name))
             $name = self::$reservedCountBase;
 
-        if (is_array($id)) {
-            foreach ($id as $key => $value) {
-                $guid = is_numeric($key) ? $value : $key;
-                $counts[$guid] = self::getCountFor($guid, $name);
-            }
+        if (!is_array($id))
+            return 1 * lRedis::get("$name:$id");
 
-            return $counts ?? [];
+        foreach ($id as $key => $value) {
+            $guid = is_numeric($key) ? $value : $key;
+            $counts[$guid] = self::getCountFor($guid, $name);
         }
 
-        return 1 * lRedis::get("$name:$id");
+        return $counts ?? [];
     }
 
     /**
@@ -143,21 +142,40 @@ class Reservator {
         if (is_null($name))
             $name = self::$pendingCountBase;
 
-        if (is_array($id)) {
-            foreach ($id as $key => $guid) {
-                if (!is_numeric($key)) {
-                    // $key is a GUID, $guid is the diff value
-                    $diff = $guid;
-                    $guid = $key;
-                }
-
-                $counts[$guid] = self::incrementCountFor($guid, $name, $diff);
-            }
-
-            return $counts ?? [];
+        if (!is_array($id)) {
+            return lRedis::incrBy("$name:$id", $diff);
         }
 
-        return lRedis::incrBy("$name:$id", $diff);
+        foreach ($id as $key => $value) {
+            if (is_string($key)) {
+                // key is guid
+                $counts[$key][] = (int) $value;
+            } else if (is_string($value)) {
+                // value is guid
+                $counts[$value][] = $diff;
+            } else {
+                // Should not happen, ever, we dont want integers as identifiers and also no string as incrementation value!
+                // Ignore
+            }
+        }
+
+        $counts = array_map('array_sum', $counts ?? []);
+        $countsMap = array_keys($counts);
+
+        $pipeline = lRedis::pipeline();
+
+        foreach ($counts as $guid => $diff) {
+            $pipeline->incrBy("$name:$guid", $diff);
+        }
+
+        $executed = $pipeline->execute();
+
+        foreach ($executed as $i => $result) {
+            if (array_key_exists($i, $countsMap))
+                $newCounts[$countsMap[$i]] = $result;
+        }
+
+        return $newCounts ?? [];
     }
 
     public static function checkReservation ($key, $reservation) {

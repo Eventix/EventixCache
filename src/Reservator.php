@@ -142,8 +142,13 @@ class Reservator {
         if (is_null($name))
             $name = self::$pendingCountBase;
 
+        if ($name !== false)
+            $name = "$name:";
+        else
+            $name = '';
+
         if (!is_array($id)) {
-            return lRedis::incrBy("$name:$id", $diff);
+            return lRedis::incrBy("$name" . "$id", $diff);
         }
 
         foreach ($id as $key => $value) {
@@ -165,7 +170,7 @@ class Reservator {
         $pipeline = lRedis::pipeline();
 
         foreach ($counts as $guid => $diff) {
-            $pipeline->incrBy("$name:$guid", $diff);
+            $pipeline->incrBy("$name" . "$guid", $diff);
         }
 
         $executed = $pipeline->execute();

@@ -23,10 +23,8 @@ trait Reservable {
 
         if ($this->isReservable(true, $guid, $currentReservedCount) === false) {
             $this->releaseReserved($guid);
-
             return false;
         }
-
         return $guid;
     }
 
@@ -54,6 +52,7 @@ trait Reservable {
         $count += lRedis::srem($key . ':reserves', $guid);
 
         $hashKey = 'reservation:' . $key . ":$guid:childReservations";
+
         $all = lRedis::smembers($hashKey);
 
         sort($all);
@@ -106,9 +105,9 @@ trait Reservable {
         foreach ($toAdd as $guid => $reservations) {
             switch (gettype($reservations)) {
                 case 'array':
-                    foreach ($reservations as $reservation) {
-                        $this->easyParsed[$class][$guid][] = $reservation;
-                        $to[] = "$class:$key:$guid:$reservation";
+                    foreach ($reservations as $res) {
+                        $this->easyParsed[$class][$guid][] = $res;
+                        $to[] = "$class:$key:$guid:$res";
                     }
                     break;
                 case 'string':

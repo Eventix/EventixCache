@@ -209,7 +209,10 @@ class Reservator {
         $reservedCountBase = self::$reservedCountBase;
 
         // First delete basekey, when nothing is deleted, return false
-        if (lRedis::del($baseKey) == 0)
+        $delCount = lRedis::del($baseKey);
+        $matches = lRedis::keys($baseKey.'*');
+
+        if (count($matches) == 0 && $delCount == 0)
             return false;
 
         $id = lRedis::get("$baseKey:id");

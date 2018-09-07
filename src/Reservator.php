@@ -215,25 +215,23 @@ class Reservator {
         if (empty($id))
             return false;
 
-        if (!empty($id)) {
-            // Release all child reservations
-            $cursor = 0;
-            do {
-                list($cursor, $keys) = lRedis::hscan("$baseKey:children", $cursor);
-                foreach ($keys as $childReservation => $childKey)
-                    self::release($childReservation);
-            } while ($cursor);
+        // Release all child reservations
+        $cursor = 0;
+        do {
+            list($cursor, $keys) = lRedis::hscan("$baseKey:children", $cursor);
+            foreach ($keys as $childReservation => $childKey)
+                self::release($childReservation);
+        } while ($cursor);
 
-            // Now decrement and delete all relevant keys
-            $result = lRedis::pipeline()
-                            ->del("$baseKey:id")
-                            ->incrBy("$reservedCountBase:$id", -1)
-                            ->del("$baseKey:children")
-                            ->execute();
+        // Now decrement and delete all relevant keys
+        $result = lRedis::pipeline()
+                        ->del("$baseKey:id")
+                        ->incrBy("$reservedCountBase:$id", -1)
+                        ->del("$baseKey:children")
+                        ->execute();
 
-            if ($result[0] !== 1 || $result[1] < 0) {
-                // TODO something failed.. what to do??
-            }
+        if ($result[0] !== 1 || $result[1] < 0) {
+            // TODO something failed.. what to do??
         }
 
         return true;

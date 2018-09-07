@@ -209,13 +209,11 @@ class Reservator {
         $reservedCountBase = self::$reservedCountBase;
 
         // First delete basekey, when nothing is deleted, return false
-        $delCount = lRedis::del($baseKey);
-        $matches = lRedis::keys($baseKey.'*');
-
-        if (count($matches) == 0 && $delCount == 0)
-            return false;
-
+        lRedis::del($baseKey);
         $id = lRedis::get("$baseKey:id");
+
+        if (empty($id))
+            return false;
 
         if (!empty($id)) {
             // Release all child reservations

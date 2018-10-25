@@ -3,9 +3,8 @@
 namespace Eventix\Cache;
 
 use Illuminate\Foundation\Bus\DispatchesJobs;
-use lRedis;
+use Illuminate\Support\Facades\Redis;
 use Illuminate\Console\Command;
-use Helpers;
 
 class ReservationExpireHandler extends Command {
     use DispatchesJobs;
@@ -30,9 +29,10 @@ class ReservationExpireHandler extends Command {
      * @return mixed
      */
     public function handle() {
-        lRedis::pSubscribe(['__keyevent@*__:expired'], function ($message) {
+        Redis::pSubscribe(['__keyevent@*__:expired'], function ($message) {
             $base = Reservator::$base . ":";
             $this->dispatch(new RemoveReservation(substr($message, strlen($base))));
         });
     }
 }
+

@@ -20,6 +20,12 @@ class Reservator {
         array_map(['self', 'release'], $reservations ?? static::$releases);
     }
 
+    public static function releaseChildReservations($childReservations = []) {
+        foreach ($childReservations as $childProduct)
+            foreach ($childProduct as $childReservation)
+                self::release($childReservation);
+    }
+
     /**
      * @param $id
      * @param $duration
@@ -43,7 +49,7 @@ class Reservator {
             // If not empty we are interfering with another reservation, so simply decrement and return false
             self::decrementReservedCountFor($id);
 
-            return false;
+            return ReservationErrors::OtherError;
         }
 
         // Add the child reservations
@@ -85,7 +91,7 @@ class Reservator {
         if (is_null($name))
             $name = self::$reservedCountBase;
 
-        if (!is_array($id))
+        if (!is_iterable($id))
             return 1 * Redis::get("$name:$id");
 
         foreach ($id as $key => $value) {

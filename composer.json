@@ -25,5 +25,12 @@
             "Eventix\\Cache\\": "src"
         }
     },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Eventix\\Cache\\CacheServiceProvider"
+            ]
+        }
+    },
     "minimum-stability": "stable"
 }

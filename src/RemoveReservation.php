@@ -3,11 +3,8 @@
 namespace Eventix\Cache;
 
 use App\Jobs\Job;
-use Illuminate\Queue\SerializesModels;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Contracts\Queue\ShouldQueue;
-use lRedis;
-use Helpers;
 
 class RemoveReservation extends Job implements ShouldQueue {
     use InteractsWithQueue;

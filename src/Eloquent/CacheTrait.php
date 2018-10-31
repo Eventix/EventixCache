@@ -5,7 +5,7 @@ namespace Eventix\Cache\Eloquent;
 use Helpers;
 use Illuminate\Contracts\Support\Jsonable;
 use Illuminate\Database\Eloquent\Model;
-use lRedis;
+use Illuminate\Support\Facades\Redis;
 
 trait CacheTrait {
 
@@ -33,7 +33,7 @@ trait CacheTrait {
 
             $key = Helpers::cacheKey($model);
             if (!empty($dirty))
-                lRedis::hmset($key . ":properties", $dirty);
+                Redis::hmset($key . ":properties", $dirty);
         }, 1000);
 
         static::created(function (Model $model) {
@@ -51,7 +51,7 @@ trait CacheTrait {
 
             $key = Helpers::cacheKey($model);
             if (!empty($dirty))
-                lRedis::hmset($key . ":properties", $dirty);
+                Redis::hmset($key . ":properties", $dirty);
         });
     }
 
@@ -108,7 +108,7 @@ trait CacheTrait {
 
         $key = Helpers::cacheKey($instance) . ":properties";
         $dirty = array_intersect_key($instance->toArray(), array_flip($instance->getCachedProperties()));
-        lRedis::hmset($key, $dirty);
+        Redis::hmset($key, $dirty);
 
         return $dirty;
     }
@@ -116,7 +116,7 @@ trait CacheTrait {
     public static function findJustCached($guid) {
         $class = get_class();
         $key = Helpers::cacheKey($class, $guid);
-        $all = lRedis::hgetall($key . ":properties");
+        $all = Redis::hgetall($key . ":properties");
 
         $instance = new $class;
         $casts = $instance->getCasts();
@@ -137,7 +137,7 @@ trait CacheTrait {
      * @return void
      */
     public function forgetCached() {
-        lRedis::del(Helpers::cacheKey($this) . ":properties");
+        Redis::del(Helpers::cacheKey($this) . ":properties");
     }
 
     public function getAppends() {
@@ -209,7 +209,7 @@ trait CacheTrait {
         if (count($loadKeys)) {
 
             $key = Helpers::cacheKey($f);
-            $base = lRedis::hmget($key . ":properties", $loadKeys);
+            $base = Redis::hmget($key . ":properties", $loadKeys);
 
             $vals = array_combine($loadKeys, $base);
             $f->hydrateCached($vals);
@@ -232,7 +232,7 @@ trait CacheTrait {
     public function increment($column, $amount = 1, array $extra = []) {
         if (in_array($column, $this->getCachedProperties())){
             $key = Helpers::cacheKey($this);
-            lRedis::hincrby($key . ":properties", $column, $amount);
+            Redis::hincrby($key . ":properties", $column, $amount);
         }
 
         if (array_key_exists($column, $this->attributes)) // For exisiting DB Properties
@@ -242,7 +242,7 @@ trait CacheTrait {
     public function decrement($column, $amount = 1, array $extra = []) {
         if (in_array($column, $this->getCachedProperties())) {
             $key = Helpers::cacheKey($this);
-            lRedis::hincrby($key . ":properties", $column, (-1) * $amount);
+            Redis::hincrby($key . ":properties", $column, (-1) * $amount);
         }
 
         if (array_key_exists($column, $this->attributes)) // For exisiting DB Properties

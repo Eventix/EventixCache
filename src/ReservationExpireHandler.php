@@ -35,4 +35,3 @@ class ReservationExpireHandler extends Command {
         });
     }
 }
-

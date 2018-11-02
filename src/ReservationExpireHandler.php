@@ -29,6 +29,7 @@ class ReservationExpireHandler extends Command {
      * @return mixed
      */
     public function handle() {
+        Redis::getFacadeRoot()->setOption(\Redis::OPT_READ_TIMEOUT, -1);
         Redis::pSubscribe(['__keyevent@*__:expired'], function ($message) {
             $base = Reservator::$base . ":";
             $this->dispatch(new RemoveReservation(substr($message, strlen($base))));

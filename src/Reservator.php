@@ -11,6 +11,7 @@ class Reservator {
     public static $base = "reservation";
     public static $reservedCountBase = "reservedcount";
     public static $pendingCountBase = "pendingcount";
+    const extraReservationTime = 10;
 
     public static function addRelease($reservation) {
         static::$releases[] = $reservation;
@@ -21,27 +22,38 @@ class Reservator {
     }
 
     public static function releaseChildReservations($childReservations = []) {
-        foreach ($childReservations as $childProduct)
-            foreach ($childProduct as $childReservation)
+        foreach ($childReservations as $childProduct) {
+            foreach ($childProduct as $childReservation) {
                 self::release($childReservation);
+            }
+        }
     }
 
     /**
-     * @param $id
-     * @param $duration
+     * @param       $id
+     * @param       $duration
      * @param array $childReservations
+     * @param bool  $isChild WHether this is a child, which means we will *not* set an expiry
      * @return bool|string
      * @throws \Exception
      */
-    public static function reserve($id, $duration, $childReservations = []) {
-        $reservation = (string)Uuid::generate();
+    public static function reserve($id, $duration, $childReservations = [], $isChild = false) {
+        $reservation = (string) Uuid::generate();
 
         $base = self::$base . ":" . $reservation;
         $reservedCountBase = self::$reservedCountBase;
 
+        // Allready add one extraReservationTime expiry
+        $expiry = $duration * 60 + self::extraReservationTime;
+
+        // Set the expiry event further when we are a childreservation
+        if ($isChild) {
+            $expiry += self::extraReservationTime;
+        }
+
         $result = Redis::transaction()
             ->getset("$base:id", $id)// Set a key so we can always retrieve the id of the reserved object
-            ->setex($base, $duration * 60, $id)// Set another key which expires at the desired duration
+            ->setex($base, $expiry, $id)// Set another key which expires at the desired duration, add some extra time to reduce a data race
             ->incr("$reservedCountBase:$id")// Increment the reservedcount for the id of the thing we are reserving
             ->exec();
 
@@ -56,9 +68,11 @@ class Reservator {
         if (is_array($childReservations) && count($childReservations)) {
 
             $set = [];
-            foreach ($childReservations as $obj => $child)
-                foreach ($child as $res)
+            foreach ($childReservations as $obj => $child) {
+                foreach ($child as $res) {
                     $set[$res] = $obj;
+                }
+            }
 
             Redis::hmset("$base:children", $set);
         }
@@ -84,15 +98,17 @@ class Reservator {
 
     /**
      * @param string|array $id
-     * @param string|null $name
+     * @param string|null  $name
      * @return array|float|int
      */
     public static function getCountFor($id, $name = null) {
-        if (is_null($name))
+        if (is_null($name)) {
             $name = self::$reservedCountBase;
+        }
 
-        if (!is_iterable($id))
+        if (!is_iterable($id)) {
             return 1 * Redis::get("$name:$id");
+        }
 
         foreach ($id as $key => $value) {
             $guid = is_numeric($key) ? $value : $key;
@@ -104,7 +120,7 @@ class Reservator {
 
     /**
      * @param string|array $id
-     * @param int $diff
+     * @param int          $diff
      * @return array|float|int
      */
     public static function incrementReservedCountFor($id, int $diff = 1) {
@@ -113,7 +129,7 @@ class Reservator {
 
     /**
      * @param string|array $id
-     * @param int $diff
+     * @param int          $diff
      * @return array|float|int
      */
     public static function incrementPendingCountFor($id, int $diff = 1) {
@@ -122,7 +138,7 @@ class Reservator {
 
     /**
      * @param string|array $id
-     * @param int $diff
+     * @param int          $diff
      * @return array|float|int
      */
     public static function decrementReservedCountFor($id, int $diff = 1) {
@@ -131,7 +147,7 @@ class Reservator {
 
     /**
      * @param string|array $id
-     * @param int $diff
+     * @param int          $diff
      * @return array|float|int
      */
     public static function decrementPendingCountFor($id, int $diff = 1) {
@@ -140,18 +156,20 @@ class Reservator {
 
     /**
      * @param string|array $id
-     * @param string|null $name
-     * @param int $diff
+     * @param string|null  $name
+     * @param int          $diff
      * @return array|float|int
      */
     public static function incrementCountFor($id, $name = null, int $diff = 1) {
-        if (is_null($name))
+        if (is_null($name)) {
             $name = self::$pendingCountBase;
+        }
 
-        if ($name !== false)
+        if ($name !== false) {
             $name = "$name:";
-        else
+        } else {
             $name = '';
+        }
 
         if (!is_array($id)) {
             return Redis::incrBy("$name" . "$id", $diff);
@@ -160,7 +178,7 @@ class Reservator {
         foreach ($id as $key => $value) {
             if (is_string($key)) {
                 // key is guid
-                $counts[$key][] = (int)$value;
+                $counts[$key][] = (int) $value;
             } else if (is_string($value)) {
                 // value is guid
                 $counts[$value][] = $diff;
@@ -173,34 +191,40 @@ class Reservator {
         $counts = array_map('array_sum', $counts ?? []);
         $countsMap = array_keys($counts);
 
-        $executed = Redis::pipeline(function($pipe) use ($counts, $name) {
-            foreach ($counts as $guid => $diff)
+        $executed = Redis::pipeline(function ($pipe) use ($counts, $name) {
+            foreach ($counts as $guid => $diff) {
                 $pipe->incrBy($name . $guid, $diff);
+            }
         });
 
         foreach ($executed as $i => $result) {
-            if (array_key_exists($i, $countsMap))
+            if (array_key_exists($i, $countsMap)) {
                 $newCounts[$countsMap[$i]] = $result;
+            }
         }
 
         return $newCounts ?? [];
     }
 
-    public static function checkReservation($key, $reservation) {
+    public static function checkReservation($key, $reservation, $child = false) {
         $baseKey = self::$base . ":" . $reservation;
 
-        // If key is not valid, reservation does not hold
-        if (Redis::get("$baseKey:id") != $key)
+        // If the keys do not match, or we are a root reservation and the ttl is less then the extra expiry time it cannot be valid
+        if (Redis::get("$baseKey:id") != $key && Redis::ttl("$baseKey") < ((intval($child) + 1) * self::extraReservationTime)) {
             return false;
+        }
 
         // Check all child reservations
         // Release all child reservations
         $it = null;
         $baseConnection = Redis::connection()->client();
-        while($keys = $baseConnection->hscan("$baseKey:children", $it))
-            foreach ($keys as $childReservation => $childKey)
-                if (!static::checkReservation($childKey, $childReservation))
+        while ($keys = $baseConnection->hscan("$baseKey:children", $it)) {
+            foreach ($keys as $childReservation => $childKey) {
+                if (!static::checkReservation($childKey, $childReservation, true)) {
                     return false;
+                }
+            }
+        }
 
         return true;
     }
@@ -213,15 +237,18 @@ class Reservator {
         Redis::del($baseKey);
         $id = Redis::get("$baseKey:id");
 
-        if (empty($id))
+        if (empty($id)) {
             return false;
+        }
 
         // Release all child reservations
         $it = null;
         $baseConnection = Redis::connection()->client();
-        while($keys = $baseConnection->hscan("$baseKey:children", $it))
-            foreach ($keys as $childReservation => $childKey)
+        while ($keys = $baseConnection->hscan("$baseKey:children", $it)) {
+            foreach ($keys as $childReservation => $childKey) {
                 self::release($childReservation);
+            }
+        }
 
         // Now decrement and delete all relevant keys
         $result = Redis::pipeline(function ($pipe) use ($baseKey, $reservedCountBase, $id) {

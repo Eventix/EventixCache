@@ -46,9 +46,9 @@ class Reservator {
         // Allready add one extraReservationTime expiry
         $expiry = $duration * 60 + self::extraReservationTime;
 
-        // Set the expiry event further when we are a childreservation
+        // Set the expiry event further when we are a childreservation, these should not be released automatically
         if ($isChild) {
-            $expiry += self::extraReservationTime;
+            $expiry *= 5;
         }
 
         $result = Redis::transaction()
@@ -210,7 +210,7 @@ class Reservator {
         $baseKey = self::$base . ":" . $reservation;
 
         // If the keys do not match, or we are a root reservation and the ttl is less then the extra expiry time it cannot be valid
-        if (Redis::get("$baseKey:id") != $key && Redis::ttl("$baseKey") < ((intval($child) + 1) * self::extraReservationTime)) {
+        if (Redis::get("$baseKey:id") != $key || Redis::ttl("$baseKey") < ((intval($child) + 1) * self::extraReservationTime)) {
             return false;
         }
 

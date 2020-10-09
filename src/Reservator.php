@@ -77,7 +77,7 @@ class Reservator {
             Redis::hmset("$base:children", $set);
         }
 
-        return $reservation;
+        return [$result[2], $reservation];
     }
 
     /**
